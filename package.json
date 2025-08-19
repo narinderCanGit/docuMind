@@ -1,0 +1,45 @@
+{
+  "name": "documind",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview",
+    "server": "node api/index.js",
+    "start": "node api/index.js",
+    "dev-all": "./start.sh"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.12.4",
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@langchain/community": "^0.3.53",
+    "@langchain/core": "^0.3.72",
+    "@langchain/openai": "^0.6.9",
+    "@langchain/qdrant": "^0.1.3",
+    "@mui/icons-material": "^7.3.1",
+    "@mui/material": "^7.3.1",
+    "axios": "^1.11.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "multer": "^2.0.2",
+    "openai": "^5.12.2",
+    "pdf-parse": "^1.1.1",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "react-icons": "^5.5.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.0.1",
+    "vite": "^7.1.3"
+  }
+}
