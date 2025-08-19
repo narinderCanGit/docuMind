@@ -55,6 +55,45 @@ const qdrantConfig = {
   collectionName: process.env.COLLECTION_NAME || "docuMind",
 };
 
+// Function to ensure Qdrant collection exists
+const ensureQdrantCollection = async () => {
+  try {
+    // Try to connect to existing collection, if it fails, create it
+    try {
+      await QdrantVectorStore.fromExistingCollection(embeddings, qdrantConfig);
+    } catch (error) {
+      console.log(
+        `Creating new Qdrant collection: ${qdrantConfig.collectionName}`
+      );
+      // Initialize with an empty document to create the collection
+      await QdrantVectorStore.fromDocuments(
+        [
+          {
+            pageContent: "DocuMind initialization document",
+            metadata: {
+              source: "initialization",
+              timestamp: new Date().toISOString(),
+            },
+          },
+        ],
+        embeddings,
+        qdrantConfig
+      );
+      console.log(
+        `Created new Qdrant collection: ${qdrantConfig.collectionName}`
+      );
+    }
+  } catch (error) {
+    console.error(`Error ensuring Qdrant collection: ${error.message}`);
+    throw error;
+  }
+};
+
+// Ensure collection exists when server starts
+ensureQdrantCollection().catch((error) => {
+  console.error(`Failed to initialize Qdrant: ${error.message}`);
+});
+
 // Endpoint to save free text
 app.post("/api/save-text", async (req, res) => {
   try {
@@ -177,27 +216,72 @@ app.post("/api/process-website", async (req, res) => {
       return res.status(400).json({ error: "No URL provided" });
     }
 
+    // Validate URL format
+    try {
+      new URL(url); // This will throw if URL is invalid
+    } catch (urlError) {
+      return res.status(400).json({
+        error: "Invalid URL format",
+        details: urlError.message,
+      });
+    }
+
     let docs = [];
 
     // Check if URL is a PDF
     if (url.toLowerCase().endsWith(".pdf")) {
-      const loader = new WebPDFLoader(url);
-      docs = await loader.load();
+      try {
+        const loader = new WebPDFLoader(url);
+        docs = await loader.load();
+      } catch (pdfError) {
+        console.error("PDF loading error:", pdfError);
+        return res.status(500).json({
+          error: "Failed to process PDF from URL",
+          details: pdfError.message,
+        });
+      }
     } else {
       // Otherwise load as a webpage
-      const loader = new CheerioWebBaseLoader(url);
-      docs = await loader.load();
+      try {
+        const loader = new CheerioWebBaseLoader(url);
+        docs = await loader.load();
+      } catch (webError) {
+        console.error("Web loading error:", webError);
+        return res.status(500).json({
+          error: "Failed to fetch or parse webpage",
+          details: webError.message,
+        });
+      }
+    }
+
+    if (!docs || docs.length === 0) {
+      return res.status(400).json({
+        error: "No content extracted from the provided URL",
+        details: "The website might be empty or blocking content extraction",
+      });
     }
 
     // Store in Qdrant
-    await QdrantVectorStore.fromDocuments(docs, embeddings, qdrantConfig);
+    try {
+      await QdrantVectorStore.fromDocuments(docs, embeddings, qdrantConfig);
+    } catch (vectorError) {
+      console.error("Vector storage error:", vectorError);
+      return res.status(500).json({
+        error: "Failed to store website content in vector database",
+        details: vectorError.message,
+      });
+    }
 
     res.json({
       success: true,
       message: "Website content processed and saved successfully",
     });
   } catch (error) {
-    res.status(500).json({ error: "Failed to process website content" });
+    console.error("Error processing website:", error);
+    res.status(500).json({
+      error: "Failed to process website content",
+      details: error.message || "Unknown error occurred",
+    });
   }
 });
 

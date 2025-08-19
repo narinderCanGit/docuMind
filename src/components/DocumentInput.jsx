@@ -155,16 +155,29 @@ function DocumentInput({ setIsLoading, showNotification }) {
       return;
     }
 
+    // Basic URL validation
+    let url = urlInput.trim();
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+      url = "https://" + url;
+      setUrlInput(url);
+    }
+
     try {
       setIsLoading(true);
-      await axios.post(`${API_URL}/api/process-website`, { url: urlInput });
+      const response = await axios.post(`${API_URL}/api/process-website`, {
+        url,
+      });
 
       setUrlInput("");
       setShowUrlInput(false);
       showNotification("Website processed successfully!", "success");
     } catch (error) {
-      console.error("Error processing website:", error);
-      showNotification("Failed to process website", "error");
+
+      const errorMessage = error.response?.data?.details
+        ? `${error.response.data.error}: ${error.response.data.details}`
+        : error.message || "Unknown error occurred";
+
+      showNotification(`Failed to process website: ${errorMessage}`, "error");
     } finally {
       setIsLoading(false);
     }
@@ -356,6 +369,7 @@ function DocumentInput({ setIsLoading, showNotification }) {
               inputProps={{
                 style: { cursor: "text" },
               }}
+              helperText="Enter a full URL including http:// or https://"
             />
             <Stack direction="row" spacing={2}>
               <Button
