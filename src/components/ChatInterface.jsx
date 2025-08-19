@@ -68,12 +68,10 @@ function ChatInterface({ setIsLoading, showNotification }) {
         text: response.data.answer,
         sender: "ai",
         timestamp: new Date().toISOString(),
-        sources: response.data.sources,
       };
 
       setMessages((prev) => [...prev, aiMessage]);
     } catch (error) {
-      console.error("Error fetching response:", error);
       showNotification("Failed to get response", "error");
 
       // Add error message to chat
@@ -90,27 +88,27 @@ function ChatInterface({ setIsLoading, showNotification }) {
     }
   };
 
-  // Format source information
-  const formatSource = (source) => {
-    if (!source.metadata) return "Unknown source";
+  // Format the source citation to be more readable
+  const formatSourceCitation = (sourceCitation) => {
+    // Check if it's a file path source
+    const filePathMatch = sourceCitation.match(
+      /\([Ss]ource: (.*?)(, page (\d+))?\)$/i
+    );
 
-    if (source.metadata.source === "user-input") {
-      return "From your text input";
+    if (filePathMatch) {
+      const path = filePathMatch[1];
+      const pageInfo = filePathMatch[3] ? `, page ${filePathMatch[3]}` : "";
+
+      // Extract the filename from the path
+      const filename = path.includes("/") ? path.split("/").pop() : path;
+
+      if (filename) {
+        return `(Source: ${filename}${pageInfo})`;
+      }
     }
 
-    if (source.metadata.url) {
-      return `From ${source.metadata.url}`;
-    }
-
-    if (source.metadata.source) {
-      // Handle file sources
-      const filename = source.metadata.source.split("/").pop();
-      return `From ${filename}${
-        source.metadata.page ? ` (Page ${source.metadata.page})` : ""
-      }`;
-    }
-
-    return "Source document";
+    // If not a file path or couldn't extract filename, return the original
+    return sourceCitation;
   };
 
   return (
@@ -228,45 +226,46 @@ function ChatInterface({ setIsLoading, showNotification }) {
                       component="div"
                       sx={{ whiteSpace: "pre-wrap" }}
                     >
-                      {message.text}
+                      {/* Display the message text without the source citation */}
+                      {message.text.replace(/\s*\([Ss]ource:.*?\)\s*$/, "")}
                     </Typography>
 
-                    {message.sources && message.sources.length > 0 && (
-                      <Box
-                        sx={{
-                          mt: 2,
-                          pt: 1,
-                          borderTop: 1,
-                          borderColor:
-                            message.sender === "user"
-                              ? "rgba(255,255,255,0.2)"
-                              : "divider",
-                        }}
-                      >
-                        <Typography
-                          variant="subtitle2"
-                          sx={{ fontWeight: "bold", mb: 0.5 }}
+                    {/* Only display the source from the AI's answer */}
+                    {message.sender === "ai" &&
+                      message.text.match(/\([Ss]ource:.*?\)$/i) && (
+                        <Box
+                          sx={{
+                            mt: 2,
+                            pt: 1,
+                            borderTop: 1,
+                            borderColor: "divider",
+                          }}
                         >
-                          Sources:
-                        </Typography>
-                        <List dense disablePadding>
-                          {message.sources.map((source, i) => (
-                            <ListItem key={i} disablePadding disableGutters>
-                              <ListItemText
-                                primary={formatSource(source)}
-                                primaryTypographyProps={{
-                                  variant: "caption",
-                                  color:
-                                    message.sender === "user"
-                                      ? "rgba(255,255,255,0.9)"
-                                      : "text.secondary",
-                                }}
-                              />
-                            </ListItem>
-                          ))}
-                        </List>
-                      </Box>
-                    )}
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            component="div"
+                            sx={{
+                              fontStyle: "italic",
+                              display: "flex",
+                              alignItems: "flex-start",
+                              gap: 1,
+                              wordBreak: "break-word",
+                              overflowWrap: "break-word",
+                            }}
+                          >
+                            <StorageIcon
+                              fontSize="small"
+                              sx={{ opacity: 0.7, mt: 0.3, flexShrink: 0 }}
+                            />
+                            <Box sx={{ flexGrow: 1 }}>
+                              {formatSourceCitation(
+                                message.text.match(/\([Ss]ource:.*?\)$/i)[0]
+                              )}
+                            </Box>
+                          </Typography>
+                        </Box>
+                      )}
                   </CardContent>
                 </Card>
               </ListItem>

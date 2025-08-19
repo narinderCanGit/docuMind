@@ -218,15 +218,24 @@ app.post("/api/chat", async (req, res) => {
 
     // Create retriever
     const vectorRetriever = vectorStore.asRetriever({
-      k: 3, // Number of documents to retrieve
+      k: 5, // Number of documents to retrieve
     });
 
     // Get relevant chunks
-    const relevantChunks = await vectorRetriever.invoke(query);
-
-    // Create system prompt with context
+    const relevantChunks = await vectorRetriever.invoke(query); // Create system prompt with context
     const SYSTEM_PROMPT = `You are an AI assistant that answers questions based on the provided context.
+    
     Only answer based on the available context from the documents.
+    
+    At the end of your response, include a citation indicating the most relevant source for your answer, like this:
+    (Source: filename.pdf, page X) or (Source: user-input) or (Source: website URL)
+    
+    Follow these rules for the source citation:
+    1. Include only ONE source - the most relevant one
+    2. Always place it at the very end of your answer
+    3. Always use the format (Source: [details])
+    4. If the source is a file path, only include the filename, not the full path
+    5. The citation must be on the same line as the end of your answer
     
     Context:
     ${JSON.stringify(relevantChunks)}`;
@@ -242,13 +251,13 @@ app.post("/api/chat", async (req, res) => {
 
     res.json({
       answer: response.choices[0].message.content,
-      sources: relevantChunks.map((chunk) => ({
-        content: chunk.pageContent.substring(0, 150) + "...",
-        metadata: chunk.metadata,
-      })),
     });
   } catch (error) {
-    res.status(500).json({ error: "Failed to generate response" });
+    console.error("Error generating chat response:", error);
+    res.status(500).json({
+      error: "Failed to generate response",
+      details: error.message,
+    });
   }
 });
 
