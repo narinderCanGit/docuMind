@@ -6,12 +6,12 @@ import path from "path";
 import { fileURLToPath } from "url";
 import "dotenv/config";
 import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
-import { CSVLoader } from "@langchain/community/document_loaders/fs/csv";
 import { WebPDFLoader } from "@langchain/community/document_loaders/web/pdf";
 import { CheerioWebBaseLoader } from "@langchain/community/document_loaders/web/cheerio";
 import { OpenAIEmbeddings } from "@langchain/openai";
 import { QdrantVectorStore } from "@langchain/qdrant";
 import OpenAI from "openai";
+import { Document } from "@langchain/core/documents";
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -77,7 +77,6 @@ app.post("/api/save-text", async (req, res) => {
 
     res.json({ success: true, message: "Text saved successfully" });
   } catch (error) {
-    console.error("Error saving text:", error);
     res.status(500).json({ error: "Failed to save text" });
   }
 });
@@ -98,17 +97,50 @@ app.post(
 
       // Process different file types
       if (fileExtension === ".pdf") {
-        const loader = new PDFLoader(filePath);
-        docs = await loader.load();
+        try {
+          const loader = new PDFLoader(filePath);
+          docs = await loader.load();
+        } catch (pdfError) {
+          return res.status(500).json({
+            error: "Failed to process PDF file",
+            details: pdfError.message,
+          });
+        }
       } else if (fileExtension === ".csv") {
-        const loader = new CSVLoader(filePath);
-        docs = await loader.load();
+        try {
+          // Read the CSV file content for debugging
+          const fileContent = fs.readFileSync(filePath, "utf8");
+
+          // Create a simple document from the CSV content instead of parsing
+          docs = [
+            new Document({
+              pageContent: fileContent,
+              metadata: {
+                source: req.file.originalname,
+                type: "csv",
+                timestamp: new Date().toISOString(),
+              },
+            }),
+          ];
+        } catch (csvError) {
+          return res.status(500).json({
+            error: "Failed to process CSV file",
+            details: csvError.message,
+          });
+        }
       } else {
         return res.status(400).json({ error: "Unsupported file type" });
       }
 
       // Store in Qdrant
-      await QdrantVectorStore.fromDocuments(docs, embeddings, qdrantConfig);
+      try {
+        await QdrantVectorStore.fromDocuments(docs, embeddings, qdrantConfig);
+      } catch (storageError) {
+        return res.status(500).json({
+          error: "Failed to store documents in vector database",
+          details: storageError.message,
+        });
+      }
 
       // Clean up the file after processing
       fs.unlinkSync(filePath);
@@ -118,8 +150,20 @@ app.post(
         message: "Document processed and saved successfully",
       });
     } catch (error) {
-      console.error("Error processing document:", error);
-      res.status(500).json({ error: "Failed to process document" });
+      // If the file exists, try to keep it for debugging
+      try {
+        if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+          const debugPath = req.file.path + ".debug";
+          fs.copyFileSync(req.file.path, debugPath);
+        }
+      } catch (fsError) {
+        console.error("Error saving debug file:", fsError);
+      }
+
+      res.status(500).json({
+        error: "Failed to process document",
+        details: error.message,
+      });
     }
   }
 );
@@ -153,7 +197,6 @@ app.post("/api/process-website", async (req, res) => {
       message: "Website content processed and saved successfully",
     });
   } catch (error) {
-    console.error("Error processing website:", error);
     res.status(500).json({ error: "Failed to process website content" });
   }
 });
@@ -205,7 +248,6 @@ app.post("/api/chat", async (req, res) => {
       })),
     });
   } catch (error) {
-    console.error("Error generating chat response:", error);
     res.status(500).json({ error: "Failed to generate response" });
   }
 });

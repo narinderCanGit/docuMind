@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   Paper,
   Typography,
@@ -11,12 +11,15 @@ import {
   InputLabel,
   FormControl,
   FormHelperText,
+  IconButton,
 } from "@mui/material";
 import {
   Upload as UploadIcon,
   Link as LinkIcon,
   Send as SendIcon,
   Description as FileIcon,
+  Delete as DeleteIcon,
+  CloudUpload as CloudUploadIcon,
 } from "@mui/icons-material";
 import axios from "axios";
 
@@ -27,6 +30,8 @@ function DocumentInput({ setIsLoading, showNotification }) {
   const [urlInput, setUrlInput] = useState("");
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef(null);
 
   const handleTextSubmit = async (e) => {
     e.preventDefault();
@@ -54,6 +59,41 @@ function DocumentInput({ setIsLoading, showNotification }) {
     console.log("File selected:", e.target.files[0]);
     if (e.target.files && e.target.files[0]) {
       setSelectedFile(e.target.files[0]);
+    }
+  };
+
+  const handleRemoveFile = () => {
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const file = e.dataTransfer.files[0];
+      const fileType = file.type;
+
+      if (fileType.includes("pdf") || fileType.includes("csv")) {
+        setSelectedFile(file);
+      } else {
+        showNotification("Only PDF and CSV files are supported", "error");
+      }
     }
   };
 
@@ -98,7 +138,10 @@ function DocumentInput({ setIsLoading, showNotification }) {
       );
     } catch (error) {
       console.error("Error uploading document:", error);
-      showNotification(`Failed to upload document: ${error.message}`, "error");
+      const errorMessage = error.response?.data?.details
+        ? `${error.response.data.error}: ${error.response.data.details}`
+        : error.message || "Unknown error occurred";
+      showNotification(`Failed to upload document: ${errorMessage}`, "error");
     } finally {
       setIsLoading(false);
     }
@@ -179,13 +222,14 @@ function DocumentInput({ setIsLoading, showNotification }) {
         <Typography variant="h6" sx={{ mb: 2 }}>
           Document Upload
         </Typography>
-        
+
         <Box
           component="form"
           onSubmit={handleFileUpload}
+          onDragEnter={handleDrag}
           sx={{
             border: "2px dashed",
-            borderColor: "primary.main",
+            borderColor: dragActive ? "secondary.main" : "primary.main",
             borderRadius: 2,
             p: 3,
             mb: 2,
@@ -199,47 +243,89 @@ function DocumentInput({ setIsLoading, showNotification }) {
                   : "rgba(63, 81, 181, 0.05)",
             },
             position: "relative",
+            backgroundColor: dragActive
+              ? (theme) =>
+                  theme.palette.mode === "dark"
+                    ? "rgba(33, 150, 243, 0.1)"
+                    : "rgba(63, 81, 181, 0.1)"
+              : "transparent",
           }}
         >
-          <FileIcon color="primary" sx={{ fontSize: 48, mb: 2 }} />
-
-          <Typography variant="body1" gutterBottom>
-            {selectedFile
-              ? selectedFile.name
-              : "Select a file to upload"}
-          </Typography>
-
-          {selectedFile && (
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              {selectedFile.type} ({Math.round(selectedFile.size / 1024)} KB)
-            </Typography>
+          {dragActive && (
+            <Box
+              position="absolute"
+              width="100%"
+              height="100%"
+              top={0}
+              right={0}
+              bottom={0}
+              left={0}
+              onDragEnter={handleDrag}
+              onDragLeave={handleDrag}
+              onDragOver={handleDrag}
+              onDrop={handleDrop}
+            />
           )}
 
-          <Button
-            variant="contained"
-            component="label"
-            color="primary"
-            sx={{ mt: 2 }}
-            startIcon={<UploadIcon />}
-          >
-            Browse Files
-            <input
-              type="file"
-              hidden
-              accept=".pdf,.csv"
-              onChange={handleFileChange}
-            />
-          </Button>
-
-          {selectedFile && (
-            <Button
-              type="submit"
-              variant="contained"
-              color="secondary"
-              sx={{ mt: 2, ml: 2 }}
-            >
-              Upload Document
-            </Button>
+          {selectedFile ? (
+            <Box>
+              <FileIcon color="primary" sx={{ fontSize: 48, mb: 2 }} />
+              <Typography
+                variant="body1"
+                gutterBottom
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {selectedFile.name}
+                <IconButton
+                  color="error"
+                  size="small"
+                  onClick={handleRemoveFile}
+                  sx={{ ml: 1 }}
+                  aria-label="Remove file"
+                >
+                  <DeleteIcon />
+                </IconButton>
+              </Typography>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                {selectedFile.type} ({Math.round(selectedFile.size / 1024)} KB)
+              </Typography>
+              <Button
+                type="submit"
+                variant="contained"
+                color="success"
+                sx={{ mt: 2 }}
+                startIcon={<CloudUploadIcon />}
+              >
+                Upload Document
+              </Button>
+            </Box>
+          ) : (
+            <>
+              <CloudUploadIcon color="primary" sx={{ fontSize: 48, mb: 2 }} />
+              <Typography variant="body1" gutterBottom>
+                Drag & drop a file here, or click to browse
+              </Typography>
+              <Button
+                variant="contained"
+                component="label"
+                color="primary"
+                sx={{ mt: 2 }}
+                startIcon={<UploadIcon />}
+              >
+                Browse Files
+                <input
+                  type="file"
+                  hidden
+                  ref={fileInputRef}
+                  accept=".pdf,.csv"
+                  onChange={handleFileChange}
+                />
+              </Button>
+            </>
           )}
         </Box>
         <FormHelperText>Supported formats: PDF, CSV</FormHelperText>
