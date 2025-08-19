@@ -27,6 +27,7 @@ const API_URL = import.meta.env.VITE_API_URL || "";
 function ChatInterface({ setIsLoading, showNotification }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
 
   // Auto-scroll to bottom of messages
@@ -54,10 +55,9 @@ function ChatInterface({ setIsLoading, showNotification }) {
 
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
+    setIsTyping(true);
 
     try {
-      setIsLoading(true);
-
       // Send query to API
       const response = await axios.post(`${API_URL}/api/chat`, {
         query: input,
@@ -86,7 +86,7 @@ function ChatInterface({ setIsLoading, showNotification }) {
 
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
-      setIsLoading(false);
+      setIsTyping(false);
     }
   };
 
@@ -276,6 +276,83 @@ function ChatInterface({ setIsLoading, showNotification }) {
         )}
       </Box>
 
+      {/* Add typing indicator */}
+      {isTyping && (
+        <ListItem alignItems="flex-start">
+          <ListItemIcon sx={{ minWidth: "auto", mr: 1 }}>
+            <Avatar
+              sx={{
+                bgcolor: "secondary.main",
+                width: 36,
+                height: 36,
+                boxShadow: 2,
+              }}
+            >
+              <StorageIcon fontSize="small" />
+            </Avatar>
+          </ListItemIcon>
+          <Card
+            sx={{
+              maxWidth: "85%",
+              bgcolor: "background.paper",
+              borderRadius: "4px 16px 16px 16px",
+              boxShadow: 1,
+              p: 2,
+            }}
+            variant="outlined"
+          >
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.5,
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    bgcolor: "secondary.main",
+                    borderRadius: "50%",
+                    animation: "pulse 1s infinite",
+                    animationDelay: "0s",
+                    "@keyframes pulse": {
+                      "0%": { opacity: 0.2 },
+                      "50%": { opacity: 1 },
+                      "100%": { opacity: 0.2 },
+                    },
+                  }}
+                />
+                <Box
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    bgcolor: "secondary.main",
+                    borderRadius: "50%",
+                    animation: "pulse 1s infinite",
+                    animationDelay: "0.3s",
+                  }}
+                />
+                <Box
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    bgcolor: "secondary.main",
+                    borderRadius: "50%",
+                    animation: "pulse 1s infinite",
+                    animationDelay: "0.6s",
+                  }}
+                />
+              </Box>
+              <Typography variant="body2" color="text.secondary">
+                Thinking...
+              </Typography>
+            </Box>
+          </Card>
+        </ListItem>
+      )}
+
       <Box
         component="form"
         onSubmit={handleSubmit}
@@ -306,7 +383,7 @@ function ChatInterface({ setIsLoading, showNotification }) {
                 type="submit"
                 variant="contained"
                 color="primary"
-                disabled={!input.trim()}
+                disabled={!input.trim() || isTyping}
                 sx={{
                   borderRadius: "50%",
                   minWidth: 40,
@@ -316,7 +393,11 @@ function ChatInterface({ setIsLoading, showNotification }) {
                   cursor: "pointer",
                 }}
               >
-                <SendIcon fontSize="small" />
+                {isTyping ? (
+                  <SendIcon disabled="true" fontSize="small" />
+                ) : (
+                  <SendIcon fontSize="small" />
+                )}
               </Button>
             ),
           }}
