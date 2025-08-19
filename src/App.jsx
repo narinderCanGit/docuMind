@@ -46,6 +46,7 @@ function App() {
             main: mode === "dark" ? blue[300] : indigo[500],
             light: mode === "dark" ? blue[200] : indigo[300],
             dark: mode === "dark" ? blue[400] : indigo[700],
+            contrastText: mode === "dark" ? "#000" : "#fff",
           },
           secondary: {
             main: mode === "dark" ? "#81c784" : "#f06292",
@@ -56,7 +57,7 @@ function App() {
             default: mode === "dark" ? blueGrey[900] : grey[50],
             paper:
               mode === "dark"
-                ? "rgba(35, 48, 68, 0.9)"
+                ? "rgba(26, 35, 51, 0.95)" 
                 : "rgba(255, 255, 255, 0.9)",
           },
           text: {
@@ -102,8 +103,17 @@ function App() {
               contained: {
                 boxShadow:
                   mode === "dark"
-                    ? "0 3px 5px 2px rgba(33, 150, 243, .1)"
+                    ? "0 3px 8px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(120, 155, 255, 0.3)"
                     : "0 3px 5px 2px rgba(63, 81, 181, .1)",
+              },
+              outlined: {
+                ...(mode === "dark" && {
+                  borderColor: "rgba(120, 155, 255, 0.3)",
+                  "&:hover": {
+                    backgroundColor: "rgba(120, 155, 255, 0.08)",
+                    borderColor: "rgba(120, 155, 255, 0.5)",
+                  },
+                }),
               },
             },
           },
@@ -121,9 +131,13 @@ function App() {
                 borderRadius: 12,
                 boxShadow:
                   mode === "dark"
-                    ? "0 8px 24px rgba(0, 0, 0, 0.2)"
+                    ? "0 8px 32px rgba(0, 0, 0, 0.4), 0 0 1px rgba(120, 155, 255, 0.3)"
                     : "0 8px 24px rgba(0, 0, 0, 0.05)",
                 cursor: "default",
+                ...(mode === "dark" && {
+                  border: "1px solid rgba(120, 155, 255, 0.1)",
+                  backgroundColor: "rgba(30, 40, 58, 0.95)",
+                }),
               },
             },
           },
@@ -133,9 +147,27 @@ function App() {
                 "& .MuiOutlinedInput-root": {
                   borderRadius: 8,
                   cursor: "text",
+                  ...(mode === "dark" && {
+                    backgroundColor: "rgba(15, 22, 36, 0.6)",
+                  }),
                 },
                 "& .MuiInputBase-input": {
                   cursor: "text",
+                },
+                "& .MuiOutlinedInput-notchedOutline": {
+                  ...(mode === "dark" && {
+                    borderColor: "rgba(120, 155, 255, 0.2)",
+                  }),
+                },
+                "& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline": {
+                  ...(mode === "dark" && {
+                    borderColor: "rgba(120, 155, 255, 0.3)",
+                  }),
+                },
+                "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                  ...(mode === "dark" && {
+                    borderColor: blue[300],
+                  }),
                 },
               },
             },
@@ -191,7 +223,7 @@ function App() {
           background:
             mode === "light"
               ? "linear-gradient(135deg, rgba(236,239,244,1) 0%, rgba(231,237,249,1) 35%, rgba(225,233,246,1) 100%)"
-              : "linear-gradient(135deg, rgba(27,39,53,1) 0%, rgba(33,45,59,1) 35%, rgba(42,54,68,1) 100%)",
+              : "linear-gradient(135deg, rgba(18,27,36,1) 0%, rgba(22,32,43,1) 35%, rgba(25,35,46,1) 100%)",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
@@ -272,6 +304,12 @@ function App() {
               flex: 1,
               overflow: "auto",
               minHeight: { xs: "50vh", md: "auto" },
+              ...(mode === "dark" && {
+                background: "rgba(15, 23, 36, 0.4)",
+                borderRadius: 3,
+                border: "1px solid rgba(120, 155, 255, 0.07)",
+                boxShadow: "0 4px 20px rgba(0, 0, 0, 0.25)",
+              }),
             }}
           >
             <DocumentInput
@@ -284,6 +322,12 @@ function App() {
               flex: 1,
               overflow: "auto",
               minHeight: { xs: "50vh", md: "auto" },
+              ...(mode === "dark" && {
+                background: "rgba(15, 23, 36, 0.4)",
+                borderRadius: 3,
+                border: "1px solid rgba(120, 155, 255, 0.07)",
+                boxShadow: "0 4px 20px rgba(0, 0, 0, 0.25)",
+              }),
             }}
           >
             <ChatInterface

@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   Paper,
   Typography,
@@ -28,10 +28,51 @@ const API_URL = import.meta.env.VITE_API_URL || "";
 function DocumentInput({ setIsLoading, showNotification }) {
   const [textInput, setTextInput] = useState("");
   const [urlInput, setUrlInput] = useState("");
+  const [urlError, setUrlError] = useState(false);
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef(null);
+
+  // Helper function to validate URLs
+  const isValidUrl = (urlString) => {
+    try {
+      if (!urlString || urlString.trim() === '') {
+        return false;
+      }
+      
+      // Add protocol if missing
+      let urlToCheck = urlString.trim();
+      if (!urlToCheck.startsWith('http://') && !urlToCheck.startsWith('https://')) {
+        urlToCheck = 'https://' + urlToCheck;
+      }
+      
+      const url = new URL(urlToCheck);
+      
+      // Extract the hostname and check basic validity
+      const hostname = url.hostname;
+      
+      // Check if hostname has at least one dot and no empty parts
+      // This will accept both domain.com and subdomain.domain.com
+      const parts = hostname.split('.');
+      
+      // Must have at least 2 parts and none can be empty
+      return parts.length >= 2 && 
+             parts.every(part => part !== '') &&
+             hostname.includes('.');
+    } catch (err) {
+      return false;
+    }
+  };
+
+  // Update URL error state when URL input changes
+  useEffect(() => {
+    if (urlInput.trim() !== "") {
+      setUrlError(!isValidUrl(urlInput));
+    } else {
+      setUrlError(false);
+    }
+  }, [urlInput]);
 
   const handleTextSubmit = async (e) => {
     e.preventDefault();
@@ -155,11 +196,17 @@ function DocumentInput({ setIsLoading, showNotification }) {
       return;
     }
 
-    // Basic URL validation
+    // Prepare the URL with protocol if needed
     let url = urlInput.trim();
     if (!url.startsWith("http://") && !url.startsWith("https://")) {
       url = "https://" + url;
       setUrlInput(url);
+    }
+
+    // Validate using our helper function
+    if (!isValidUrl(url)) {
+      showNotification("Please enter a valid URL", "error");
+      return;
     }
 
     try {
@@ -360,6 +407,7 @@ function DocumentInput({ setIsLoading, showNotification }) {
               onChange={(e) => setUrlInput(e.target.value)}
               placeholder="https://example.com"
               variant="outlined"
+              error={urlError}
               sx={{
                 mb: 2,
                 "& .MuiInputBase-input": {
@@ -369,7 +417,11 @@ function DocumentInput({ setIsLoading, showNotification }) {
               inputProps={{
                 style: { cursor: "text" },
               }}
-              helperText="Enter a full URL including http:// or https://"
+              helperText={
+                urlError
+                  ? "Please enter a valid URL (e.g., https://example.com)"
+                  : "Enter a website URL to process its content"
+              }
             />
             <Stack direction="row" spacing={2}>
               <Button
@@ -377,7 +429,7 @@ function DocumentInput({ setIsLoading, showNotification }) {
                 variant="contained"
                 color="primary"
                 startIcon={<LinkIcon />}
-                disabled={!urlInput.trim()}
+                disabled={!urlInput.trim() || urlError}
               >
                 Process Website
               </Button>
