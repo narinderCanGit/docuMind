@@ -343,6 +343,24 @@ function App() {
         >
           <CircularProgress color="inherit" />
         </Backdrop>
+        
+        {/* Copyright section at the bottom */}
+        {/* <Box
+          component="footer"
+          sx={{
+            py: 1.5,
+            px: 2,
+            mt: 1,
+            textAlign: "center",
+            borderTop: 1,
+            borderColor: mode === "dark" ? "rgba(120, 155, 255, 0.1)" : "divider",
+            backgroundColor: mode === "dark" ? "rgba(15, 23, 36, 0.6)" : "rgba(245, 247, 250, 0.7)",
+          }}
+        >
+          <Typography variant="caption" color="text.secondary">
+            © 2025 DocuMind. All rights reserved.
+          </Typography>
+        </Box> */}
       </Box>
     </ThemeProvider>
   );
