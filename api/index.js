@@ -319,6 +319,8 @@ app.post("/api/chat", async (req, res) => {
     
     At the end of your response, include a citation indicating the most relevant source for your answer, like this:
     (Source: filename.pdf, page X) or (Source: user-input) or (Source: website URL)
+
+    If you don't have enough information to answer the user's query, keep source as no source available.
     
     Follow these rules for the source citation:
     1. Include only ONE source - the most relevant one
@@ -332,7 +334,7 @@ app.post("/api/chat", async (req, res) => {
 
     // Generate response from OpenAI
     const response = await client.chat.completions.create({
-      model: "gpt-4.1-mini",
+      model: "gpt-5-mini",
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: query },

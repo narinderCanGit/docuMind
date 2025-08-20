@@ -190,7 +190,13 @@ function ChatInterface({ setIsLoading, showNotification }) {
       const path = filePathMatch[1];
       const pageInfo = filePathMatch[3] ? `, page ${filePathMatch[3]}` : "";
 
-      // Extract the filename from the path
+      // Check if the source is a URL
+      if (path.startsWith("http") || path.includes("://")) {
+        // It's a URL, return the full URL
+        return `(Source: ${path}${pageInfo})`;
+      }
+
+      // For file paths, extract just the filename
       const filename = path.includes("/") ? path.split("/").pop() : path;
 
       if (filename) {
