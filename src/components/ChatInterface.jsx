@@ -7,19 +7,22 @@ import {
   Button,
   List,
   ListItem,
-  ListItemText,
   ListItemIcon,
   Avatar,
-  Divider,
   Card,
   CardContent,
-  Stack,
+  IconButton,
+  Tooltip,
+  CircularProgress,
 } from "@mui/material";
 import {
   Send as SendIcon,
   Person as PersonIcon,
   Storage as StorageIcon,
+  Mic as MicIcon,
+  MicOff as MicOffIcon,
 } from "@mui/icons-material";
+import { ReactMic } from "react-mic";
 import axios from "axios";
 
 const API_URL = import.meta.env.VITE_API_URL || "";
@@ -29,6 +32,12 @@ function ChatInterface({ setIsLoading, showNotification }) {
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
+  const micRef = useRef(null);
+
+  // Audio recording states
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [audioBlob, setAudioBlob] = useState(null);
 
   // Auto-scroll to bottom of messages
   useEffect(() => {
@@ -85,6 +94,88 @@ function ChatInterface({ setIsLoading, showNotification }) {
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsTyping(false);
+    }
+  };
+
+  const handleAudioStart = () => {
+    // Reset any previous audio blob
+    setAudioBlob(null);
+    // Start recording
+    setIsRecording(true);
+    // Show notification to guide the user
+    showNotification(
+      "Recording started. Click the mic icon again to stop and transcribe.",
+      "info"
+    );
+  };
+
+  const handleAudioStop = async (recordedBlob) => {
+    setIsRecording(false);
+    setIsTranscribing(true);
+
+    if (!recordedBlob || !recordedBlob.blob) {
+      showNotification("No audio data received. Please try again.", "error");
+      setIsTranscribing(false);
+      return;
+    }
+
+    // Save the blob for potential re-use
+    setAudioBlob(recordedBlob.blob);
+
+    // Skip transcription for very small blobs (likely just noise)
+    if (recordedBlob.blob.size < 1000) {
+      showNotification("Recording too short. Please try again.", "warning");
+      setIsTranscribing(false);
+      return;
+    }
+
+    try {
+      // Create a FormData object to send the audio file
+      const formData = new FormData();
+      // Use a consistent filename and append the blob with it
+      formData.append("audio", recordedBlob.blob, "voice-message.webm");
+
+      // Send the audio file to the backend for transcription
+      const response = await axios.post(
+        `${API_URL}/api/transcribe-audio`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      // Set the transcribed text as the input for the user to edit before sending
+      if (response.data.transcription) {
+        setInput(response.data.transcription);
+        showNotification(
+          "Audio transcribed successfully. You can edit before sending.",
+          "success"
+        );
+      } else {
+        setInput("");
+        showNotification(
+          "No speech detected in recording. Please try again.",
+          "warning"
+        );
+      }
+    } catch (error) {
+      showNotification(
+        "Failed to transcribe audio: " +
+          (error.response?.data?.error || error.message),
+        "error"
+      );
+    } finally {
+      setIsTranscribing(false);
+    }
+  };
+
+  // Function to explicitly stop recording
+  const stopRecording = () => {
+    if (isRecording) {
+      // First set the state to false so ReactMic stops recording
+      setIsRecording(false);
     }
   };
 
@@ -364,6 +455,7 @@ function ChatInterface({ setIsLoading, showNotification }) {
           onChange={(e) => setInput(e.target.value)}
           placeholder="Ask a question about your documents..."
           variant="outlined"
+          disabled={isRecording || isTranscribing}
           sx={{
             "& .MuiOutlinedInput-root": {
               borderRadius: "24px",
@@ -378,30 +470,122 @@ function ChatInterface({ setIsLoading, showNotification }) {
           }}
           InputProps={{
             endAdornment: (
-              <Button
-                type="submit"
-                variant="contained"
-                color="primary"
-                disabled={!input.trim() || isTyping}
-                sx={{
-                  borderRadius: "50%",
-                  minWidth: 40,
-                  width: 40,
-                  height: 40,
-                  p: 0,
-                  cursor: "pointer",
-                }}
-              >
-                {isTyping ? (
-                  <SendIcon disabled="true" fontSize="small" />
-                ) : (
-                  <SendIcon fontSize="small" />
-                )}
-              </Button>
+              <>
+                {/* Mic button for recording */}
+                <Tooltip
+                  title={isRecording ? "Stop Recording" : "Record Audio"}
+                >
+                  <IconButton
+                    onClick={() => {
+                      if (isRecording) {
+                        stopRecording();
+                      } else {
+                        handleAudioStart();
+                      }
+                    }}
+                    color={isRecording ? "error" : "default"}
+                    disabled={isTyping || isTranscribing}
+                    sx={{ mr: 1 }}
+                  >
+                    {isRecording ? <MicOffIcon /> : <MicIcon />}
+                  </IconButton>
+                </Tooltip>
+
+                {/* Send button */}
+                <Button
+                  type="submit"
+                  variant="contained"
+                  color="primary"
+                  disabled={
+                    !input.trim() || isTyping || isRecording || isTranscribing
+                  }
+                  sx={{
+                    borderRadius: "50%",
+                    minWidth: 40,
+                    width: 40,
+                    height: 40,
+                    p: 0,
+                    cursor: "pointer",
+                  }}
+                >
+                  {isTyping ? (
+                    <SendIcon disabled={true} fontSize="small" />
+                  ) : (
+                    <SendIcon fontSize="small" />
+                  )}
+                </Button>
+              </>
             ),
           }}
         />
       </Box>
+
+      {/* React Mic component for audio recording - Always render but only record when isRecording is true */}
+      <Box
+        sx={{
+          mt: 2,
+          borderRadius: 2,
+          overflow: "hidden",
+          border: isRecording ? "1px solid" : "none",
+          borderColor: "divider",
+          height: isRecording ? 60 : 0,
+          position: "relative",
+          transition: "height 0.3s ease",
+          display: isRecording ? "block" : "none",
+        }}
+      >
+        <ReactMic
+          ref={micRef}
+          record={isRecording}
+          onStop={handleAudioStop}
+          mimeType="audio/webm"
+          strokeColor="#3f51b5"
+          backgroundColor="rgba(200, 200, 200, 0.2)"
+          className="sound-wave"
+          visualSetting="sinewave"
+          width="100%"
+          height="60px"
+        />
+        {isRecording && (
+          <Box
+            sx={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "rgba(0,0,0,0.1)",
+            }}
+          >
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ fontWeight: "bold" }}
+            >
+              Recording... Click mic icon again to stop
+            </Typography>
+          </Box>
+        )}
+      </Box>
+
+      {/* Transcribing indicator */}
+      {isTranscribing && (
+        <Box
+          sx={{
+            display: "flex",
+            gap: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            mt: 2,
+          }}
+        >
+          <CircularProgress size={20} />
+          <Typography variant="body2">Transcribing your audio...</Typography>
+        </Box>
+      )}
     </Paper>
   );
 }

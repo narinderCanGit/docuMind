@@ -30,7 +30,8 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-const storage = multer.diskStorage({
+// Configure both storage options
+const diskStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadsDir);
   },
@@ -39,7 +40,12 @@ const storage = multer.diskStorage({
   },
 });
 
-const upload = multer({ storage });
+// For regular file uploads
+const upload = multer({ storage: diskStorage });
+
+// For audio transcription, use memory storage
+const memoryStorage = multer.memoryStorage();
+const uploadMemory = multer({ storage: memoryStorage });
 
 // OpenAI client
 const client = new OpenAI();
@@ -234,7 +240,6 @@ app.post("/api/process-website", async (req, res) => {
         const loader = new WebPDFLoader(url);
         docs = await loader.load();
       } catch (pdfError) {
-        console.error("PDF loading error:", pdfError);
         return res.status(500).json({
           error: "Failed to process PDF from URL",
           details: pdfError.message,
@@ -265,7 +270,6 @@ app.post("/api/process-website", async (req, res) => {
     try {
       await QdrantVectorStore.fromDocuments(docs, embeddings, qdrantConfig);
     } catch (vectorError) {
-      console.error("Vector storage error:", vectorError);
       return res.status(500).json({
         error: "Failed to store website content in vector database",
         details: vectorError.message,
@@ -306,7 +310,9 @@ app.post("/api/chat", async (req, res) => {
     });
 
     // Get relevant chunks
-    const relevantChunks = await vectorRetriever.invoke(query); // Create system prompt with context
+    const relevantChunks = await vectorRetriever.invoke(query);
+
+    // Create system prompt with context
     const SYSTEM_PROMPT = `You are an AI assistant that answers questions based on the provided context.
     
     Only answer based on the available context from the documents.
@@ -337,13 +343,69 @@ app.post("/api/chat", async (req, res) => {
       answer: response.choices[0].message.content,
     });
   } catch (error) {
-    console.error("Error generating chat response:", error);
     res.status(500).json({
       error: "Failed to generate response",
       details: error.message,
     });
   }
 });
+
+// Endpoint to handle audio transcription
+app.post(
+  "/api/transcribe-audio",
+  uploadMemory.single("audio"),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No audio file uploaded" });
+      }
+
+      // Skip transcription for very small files (likely just noise)
+      if (req.file.size < 1000) {
+        return res.status(400).json({ error: "Audio recording too short" });
+      }
+
+      try {
+        // Create a File object from the buffer
+        const file = new File(
+          [req.file.buffer],
+          req.file.originalname || "recording.webm",
+          {
+            type: req.file.mimetype || "audio/webm",
+          }
+        );
+
+        // Use OpenAI to transcribe the audio
+        const transcription = await client.audio.transcriptions.create({
+          file,
+          model: "whisper-1",
+          response_format: "text",
+          language: "en",
+        });
+
+        // Send the transcribed text back to the client
+        res.json({
+          success: true,
+          transcription:
+            typeof transcription === "string"
+              ? transcription
+              : transcription.text || "No speech detected",
+        });
+      } catch (transcriptionError) {
+        res.status(500).json({
+          error: "Transcription processing failed",
+          details: transcriptionError.message,
+        });
+      }
+    } catch (error) {
+      // Send detailed error to client
+      res.status(500).json({
+        error: "Transcription request failed",
+        details: error.message,
+      });
+    }
+  }
+);
 
 // Serve static assets from the build folder in production
 if (process.env.NODE_ENV === "production") {
